@@ -4,7 +4,7 @@ from firebase_admin import credentials, firestore
 from datetime import date
 
 # ======================
-# FIREBASE INIT
+# FIREBASE
 # ======================
 if not firebase_admin._apps:
     cred = credentials.Certificate("serviceAccountKey.json")
@@ -20,22 +20,18 @@ GOAL_PROTEIN = 109
 GOAL_CARBS = 210
 GOAL_FAT = 65
 
-# ======================
-# UI
-# ======================
-st.set_page_config(page_title="Macro Tracker", layout="centered")
-st.title("💪 Macro Tracker")
+st.title("💪 Macro Tracker (per 100g)")
 
 # ======================
-# PRODUCT TOEVOEGEN
+# PRODUCT TOEVOEGEN (PER 100G)
 # ======================
-st.subheader("➕ Nieuw product")
+st.subheader("➕ Nieuw product (per 100g)")
 
 name = st.text_input("Naam")
-kcal = st.number_input("Kcal", 0)
-protein = st.number_input("Eiwit (g)", 0)
-carbs = st.number_input("Koolhydraten (g)", 0)
-fat = st.number_input("Vet (g)", 0)
+kcal = st.number_input("Kcal per 100g", 0)
+protein = st.number_input("Eiwit per 100g", 0)
+carbs = st.number_input("Carbs per 100g", 0)
+fat = st.number_input("Vet per 100g", 0)
 
 if st.button("Opslaan product"):
     db.collection("foods").add({
@@ -53,19 +49,28 @@ if st.button("Opslaan product"):
 foods = [f.to_dict() for f in db.collection("foods").stream()]
 
 # ======================
-# DAG TOEVOEGEN
+# TOEVOEGEN AAN DAG
 # ======================
-st.subheader("🍽️ Toevoegen aan dag")
+st.subheader("🍽️ Eten toevoegen")
 
 if foods:
     keuze = st.selectbox("Kies product", [f["name"] for f in foods])
     selected = next(f for f in foods if f["name"] == keuze)
 
+    grams = st.number_input("Hoeveel gram gegeten?", 0)
+
     if st.button("Toevoegen"):
+        factor = grams / 100
+
         db.collection("log").add({
             "date": str(date.today()),
-            **selected
+            "name": selected["name"],
+            "kcal": selected["kcal"] * factor,
+            "protein": selected["protein"] * factor,
+            "carbs": selected["carbs"] * factor,
+            "fat": selected["fat"] * factor
         })
+
         st.success("Toegevoegd")
 
 # ======================
@@ -85,22 +90,11 @@ if logs:
     total_carbs = sum(x["carbs"] for x in logs)
     total_fat = sum(x["fat"] for x in logs)
 
-    # metrics
-    st.metric("Kcal", f"{total_kcal} / {GOAL_KCAL}")
-    st.metric("Eiwit", f"{total_protein} / {GOAL_PROTEIN}")
-    st.metric("Carbs", f"{total_carbs} / {GOAL_CARBS}")
-    st.metric("Vet", f"{total_fat} / {GOAL_FAT}")
+    st.metric("Kcal", f"{int(total_kcal)} / {GOAL_KCAL}")
+    st.metric("Eiwit", f"{int(total_protein)} / {GOAL_PROTEIN}")
+    st.metric("Carbs", f"{int(total_carbs)} / {GOAL_CARBS}")
+    st.metric("Vet", f"{int(total_fat)} / {GOAL_FAT}")
 
-    # remaining
-    st.write("### 🔥 Resterend")
-    st.write({
-        "kcal": GOAL_KCAL - total_kcal,
-        "eiwit": GOAL_PROTEIN - total_protein,
-        "carbs": GOAL_CARBS - total_carbs,
-        "vet": GOAL_FAT - total_fat
-    })
-
-    # progress bars
     st.progress(min(total_kcal / GOAL_KCAL, 1.0))
     st.progress(min(total_protein / GOAL_PROTEIN, 1.0))
     st.progress(min(total_carbs / GOAL_CARBS, 1.0))
