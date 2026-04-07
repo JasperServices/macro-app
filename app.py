@@ -1,16 +1,20 @@
 import streamlit as st
-import firebase_admin
-from firebase_admin import credentials, firestore
-from datetime import date
 
 # ======================
-# STREAMLIT SETUP
+# STREAMLIT CONFIG (MOET EERST)
 # ======================
 st.set_page_config(page_title="Macro Tracker", layout="centered")
 st.title("💪 Macro Tracker")
 
 # ======================
-# FIREBASE INIT (MOET 1X)
+# IMPORTS
+# ======================
+import firebase_admin
+from firebase_admin import credentials, firestore
+from datetime import date
+
+# ======================
+# FIREBASE INIT
 # ======================
 if not firebase_admin._apps:
     cred = credentials.Certificate("serviceAccountKey.json")
@@ -27,7 +31,7 @@ GOAL_CARBS = 210
 GOAL_FAT = 65
 
 # ======================
-# SIMPLE DATA LOAD (NO CACHE)
+# DATA LOAD (simpel, stabiel)
 # ======================
 def load_foods():
     return [f.to_dict() for f in db.collection("foods").stream()]
@@ -73,7 +77,7 @@ st.divider()
 # ======================
 # PRODUCT TOEVOEGEN
 # ======================
-st.subheader("➕ Product toevoegen (per 100g)")
+st.subheader("➕ Product (per 100g)")
 
 with st.form("product_form"):
     name = st.text_input("Naam")
@@ -99,7 +103,7 @@ with st.form("product_form"):
 st.divider()
 
 # ======================
-# ETEN TOEVOEGEN
+# ETEN LOGGEN
 # ======================
 st.subheader("🍽️ Eten toevoegen")
 
