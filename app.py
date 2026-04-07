@@ -13,15 +13,6 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 # ======================
-# SESSION STATE FIX
-# ======================
-if "written_food" not in st.session_state:
-    st.session_state.written_food = False
-
-if "written_log" not in st.session_state:
-    st.session_state.written_log = False
-
-# ======================
 # DOELEN
 # ======================
 GOAL_KCAL = 1900
@@ -33,7 +24,7 @@ st.set_page_config(page_title="Macro Tracker", layout="centered")
 st.title("💪 Macro Tracker")
 
 # ======================
-# CACHE
+# DATA LOAD
 # ======================
 @st.cache_data(ttl=5)
 def load_foods():
@@ -44,29 +35,20 @@ def load_logs():
     return [l.to_dict() for l in db.collection("log").stream()]
 
 # ======================
-# RESET BUTTON
-# ======================
-if st.button("🔄 Reset state"):
-    st.session_state.written_food = False
-    st.session_state.written_log = False
-    st.cache_data.clear()
-    st.rerun()
-
-# ======================
 # PRODUCT TOEVOEGEN
 # ======================
-st.subheader("➕ Product (per 100g)")
+st.subheader("➕ Product toevoegen (per 100g)")
 
 with st.form("product_form"):
     name = st.text_input("Naam")
     kcal = st.number_input("Kcal per 100g", min_value=0)
     protein = st.number_input("Eiwit per 100g", min_value=0)
-    carbs = st.number_input("Carbs per 100g", min_value=0)
+    carbs = st.number_input("Koolhydraten per 100g", min_value=0)
     fat = st.number_input("Vet per 100g", min_value=0)
 
-    submit_food = st.form_submit_button("Opslaan")
+    submit = st.form_submit_button("Opslaan product")
 
-    if submit_food and name and not st.session_state.written_food:
+    if submit and name.strip():
         db.collection("foods").add({
             "name": name,
             "kcal": kcal,
@@ -75,7 +57,6 @@ with st.form("product_form"):
             "fat": fat
         })
 
-        st.session_state.written_food = True
         st.cache_data.clear()
         st.success("Product opgeslagen")
         st.rerun()
@@ -86,16 +67,16 @@ with st.form("product_form"):
 st.subheader("🍽️ Eten toevoegen")
 
 foods = load_foods()
-names = [f["name"] for f in foods] if foods else []
+names = [f["name"] for f in foods]
 
-with st.form("log_form"):
-    if names:
+if names:
+    with st.form("log_form"):
         keuze = st.selectbox("Product", names)
         grams = st.number_input("Gram gegeten", min_value=0)
 
         submit_log = st.form_submit_button("Toevoegen")
 
-        if submit_log and not st.session_state.written_log:
+        if submit_log:
             selected = next(f for f in foods if f["name"] == keuze)
             factor = grams / 100
 
@@ -108,36 +89,37 @@ with st.form("log_form"):
                 "fat": selected["fat"] * factor
             })
 
-            st.session_state.written_log = True
             st.cache_data.clear()
             st.success("Toegevoegd")
             st.rerun()
 
 # ======================
-# DAG OVERZICHT
+# OVERZICHT
 # ======================
 st.subheader("📊 Vandaag")
 
 logs = load_logs()
-today_logs = [l for l in logs if l["date"] == str(date.today())]
+today = str(date.today())
+
+today_logs = [l for l in logs if l["date"] == today]
 
 if today_logs:
-    total_kcal = sum(x["kcal"] for x in today_logs)
-    total_protein = sum(x["protein"] for x in today_logs)
-    total_carbs = sum(x["carbs"] for x in today_logs)
-    total_fat = sum(x["fat"] for x in today_logs)
+    kcal = sum(x["kcal"] for x in today_logs)
+    protein = sum(x["protein"] for x in today_logs)
+    carbs = sum(x["carbs"] for x in today_logs)
+    fat = sum(x["fat"] for x in today_logs)
 
-    st.metric("Kcal", f"{int(total_kcal)} / {GOAL_KCAL}")
-    st.metric("Eiwit", f"{int(total_protein)} / {GOAL_PROTEIN}")
-    st.metric("Carbs", f"{int(total_carbs)} / {GOAL_CARBS}")
-    st.metric("Vet", f"{int(total_fat)} / {GOAL_FAT}")
+    st.metric("Kcal", f"{int(kcal)} / {GOAL_KCAL}")
+    st.metric("Eiwit", f"{int(protein)} / {GOAL_PROTEIN}")
+    st.metric("Carbs", f"{int(carbs)} / {GOAL_CARBS}")
+    st.metric("Vet", f"{int(fat)} / {GOAL_FAT}")
 
     st.write("### Progress")
 
-    st.progress(min(total_kcal / GOAL_KCAL, 1.0))
-    st.progress(min(total_protein / GOAL_PROTEIN, 1.0))
-    st.progress(min(total_carbs / GOAL_CARBS, 1.0))
-    st.progress(min(total_fat / GOAL_FAT, 1.0))
+    st.progress(min(kcal / GOAL_KCAL, 1.0))
+    st.progress(min(protein / GOAL_PROTEIN, 1.0))
+    st.progress(min(carbs / GOAL_CARBS, 1.0))
+    st.progress(min(fat / GOAL_FAT, 1.0))
 
 else:
-    st.info("Nog geen data vandaag")
+    st.info("Nog niks gelogd vandaag")
