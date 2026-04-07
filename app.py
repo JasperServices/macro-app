@@ -13,6 +13,15 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 # ======================
+# SESSION STATE FIX
+# ======================
+if "written_food" not in st.session_state:
+    st.session_state.written_food = False
+
+if "written_log" not in st.session_state:
+    st.session_state.written_log = False
+
+# ======================
 # DOELEN
 # ======================
 GOAL_KCAL = 1900
@@ -24,7 +33,7 @@ st.set_page_config(page_title="Macro Tracker", layout="centered")
 st.title("💪 Macro Tracker")
 
 # ======================
-# CACHE FUNCTIONS
+# CACHE
 # ======================
 @st.cache_data(ttl=5)
 def load_foods():
@@ -35,20 +44,29 @@ def load_logs():
     return [l.to_dict() for l in db.collection("log").stream()]
 
 # ======================
+# RESET BUTTON
+# ======================
+if st.button("🔄 Reset state"):
+    st.session_state.written_food = False
+    st.session_state.written_log = False
+    st.cache_data.clear()
+    st.rerun()
+
+# ======================
 # PRODUCT TOEVOEGEN
 # ======================
-st.subheader("➕ Product toevoegen (per 100g)")
+st.subheader("➕ Product (per 100g)")
 
 with st.form("product_form"):
     name = st.text_input("Naam")
     kcal = st.number_input("Kcal per 100g", min_value=0)
     protein = st.number_input("Eiwit per 100g", min_value=0)
-    carbs = st.number_input("Koolhydraten per 100g", min_value=0)
+    carbs = st.number_input("Carbs per 100g", min_value=0)
     fat = st.number_input("Vet per 100g", min_value=0)
 
-    submit = st.form_submit_button("Opslaan")
+    submit_food = st.form_submit_button("Opslaan")
 
-    if submit and name:
+    if submit_food and name and not st.session_state.written_food:
         db.collection("foods").add({
             "name": name,
             "kcal": kcal,
@@ -57,7 +75,9 @@ with st.form("product_form"):
             "fat": fat
         })
 
+        st.session_state.written_food = True
         st.cache_data.clear()
+        st.success("Product opgeslagen")
         st.rerun()
 
 # ======================
@@ -75,7 +95,7 @@ with st.form("log_form"):
 
         submit_log = st.form_submit_button("Toevoegen")
 
-        if submit_log:
+        if submit_log and not st.session_state.written_log:
             selected = next(f for f in foods if f["name"] == keuze)
             factor = grams / 100
 
@@ -88,11 +108,13 @@ with st.form("log_form"):
                 "fat": selected["fat"] * factor
             })
 
+            st.session_state.written_log = True
             st.cache_data.clear()
+            st.success("Toegevoegd")
             st.rerun()
 
 # ======================
-# OVERZICHT
+# DAG OVERZICHT
 # ======================
 st.subheader("📊 Vandaag")
 
