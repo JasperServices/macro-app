@@ -4,7 +4,7 @@ from firebase_admin import credentials, firestore
 from datetime import date
 
 # ======================
-# FIREBASE
+# FIREBASE INIT
 # ======================
 if not firebase_admin._apps:
     cred = credentials.Certificate("serviceAccountKey.json")
@@ -20,61 +20,71 @@ GOAL_PROTEIN = 109
 GOAL_CARBS = 210
 GOAL_FAT = 65
 
-st.title("💪 Macro Tracker (per 100g)")
+st.set_page_config(page_title="Macro Tracker", layout="centered")
+st.title("💪 Macro Tracker (stabiel + per 100g)")
 
 # ======================
-# PRODUCT TOEVOEGEN (PER 100G)
+# PRODUCT TOEVOEGEN
 # ======================
 st.subheader("➕ Nieuw product (per 100g)")
 
-name = st.text_input("Naam")
-kcal = st.number_input("Kcal per 100g", 0)
-protein = st.number_input("Eiwit per 100g", 0)
-carbs = st.number_input("Carbs per 100g", 0)
-fat = st.number_input("Vet per 100g", 0)
+with st.form("product_form"):
+    name = st.text_input("Naam")
+    kcal = st.number_input("Kcal per 100g", min_value=0)
+    protein = st.number_input("Eiwit per 100g", min_value=0)
+    carbs = st.number_input("Koolhydraten per 100g", min_value=0)
+    fat = st.number_input("Vet per 100g", min_value=0)
 
-if st.button("Opslaan product"):
-    db.collection("foods").add({
-        "name": name,
-        "kcal": kcal,
-        "protein": protein,
-        "carbs": carbs,
-        "fat": fat
-    })
-    st.success("Opgeslagen")
+    submit_product = st.form_submit_button("Opslaan product")
+
+    if submit_product and name:
+        db.collection("foods").add({
+            "name": name,
+            "kcal": kcal,
+            "protein": protein,
+            "carbs": carbs,
+            "fat": fat
+        })
+        st.success("Product opgeslagen")
+        st.rerun()
 
 # ======================
 # PRODUCTEN LADEN
 # ======================
-foods = [f.to_dict() for f in db.collection("foods").stream()]
+foods_ref = db.collection("foods").stream()
+foods = [f.to_dict() for f in foods_ref]
+names = [f["name"] for f in foods]
 
 # ======================
-# TOEVOEGEN AAN DAG
+# ETEN TOEVOEGEN
 # ======================
 st.subheader("🍽️ Eten toevoegen")
 
-if foods:
-    keuze = st.selectbox("Kies product", [f["name"] for f in foods])
-    selected = next(f for f in foods if f["name"] == keuze)
+with st.form("log_form"):
+    if foods:
+        keuze = st.selectbox("Kies product", names)
+        grams = st.number_input("Hoeveel gram gegeten?", min_value=0)
 
-    grams = st.number_input("Hoeveel gram gegeten?", 0)
+        submit_log = st.form_submit_button("Toevoegen")
 
-    if st.button("Toevoegen"):
-        factor = grams / 100
+        if submit_log:
+            selected = next(f for f in foods if f["name"] == keuze)
+            factor = grams / 100
 
-        db.collection("log").add({
-            "date": str(date.today()),
-            "name": selected["name"],
-            "kcal": selected["kcal"] * factor,
-            "protein": selected["protein"] * factor,
-            "carbs": selected["carbs"] * factor,
-            "fat": selected["fat"] * factor
-        })
+            db.collection("log").add({
+                "date": str(date.today()),
+                "name": selected["name"],
+                "kcal": selected["kcal"] * factor,
+                "protein": selected["protein"] * factor,
+                "carbs": selected["carbs"] * factor,
+                "fat": selected["fat"] * factor
+            })
 
-        st.success("Toegevoegd")
+            st.success("Toegevoegd")
+            st.rerun()
 
 # ======================
-# DAG OVERZICHT
+# DAG DATA
 # ======================
 st.subheader("📊 Vandaag")
 
@@ -94,6 +104,8 @@ if logs:
     st.metric("Eiwit", f"{int(total_protein)} / {GOAL_PROTEIN}")
     st.metric("Carbs", f"{int(total_carbs)} / {GOAL_CARBS}")
     st.metric("Vet", f"{int(total_fat)} / {GOAL_FAT}")
+
+    st.write("### 🔥 Progress")
 
     st.progress(min(total_kcal / GOAL_KCAL, 1.0))
     st.progress(min(total_protein / GOAL_PROTEIN, 1.0))
